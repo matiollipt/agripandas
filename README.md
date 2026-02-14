@@ -26,3 +26,6 @@ The code emphasises deterministic behaviour, reproducibility and a
 small, explicit API surface.  It avoids executing any arbitrary
 Python code and is suitable as a starting point for building safe
 agent-driven analytics pipelines.
+
+This is a prototype!
+
