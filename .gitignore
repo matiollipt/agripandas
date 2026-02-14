@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# secret folders
+data/
+
 # dev files
 GEMINI.md
 .python-version
