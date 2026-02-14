@@ -1,7 +1,7 @@
 agripandas
 ==========
 
-This directory contains a minimal, working implementation of an
+This repository contains a minimal, working implementation of an
 experimental tabular analytics engine designed to serve as a safe
 backend for LangChain agents.  The modules under ``agripandas`` are
 organised according to a clear layer separation:
