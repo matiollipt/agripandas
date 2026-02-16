@@ -17,8 +17,8 @@ from agripandas import (
     describe_dataframe,
     get_columns,
     compute_stat,
+    export_to_csv,
 )
-from agripandas.export import export_to_csv
 
 # --- Configuration ---
 XLSX_PATH = Path("data/1_ExemploHarvista.xlsx")

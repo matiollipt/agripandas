@@ -8,7 +8,7 @@ dataframes along with optional metadata about the origin of each table.
 
 Example:
 
-    >>> from agripandas.registry import DataFrameRegistry
+    >>> from agripandas import DataFrameRegistry
     >>> import pandas as pd
     >>> reg = DataFrameRegistry()
     >>> reg.register("foo", pd.DataFrame({"a": [1, 2]}), {"source": "demo"})
@@ -46,7 +46,7 @@ class DataFrameRegistry:
     separate instances as needed.
     
     Example:
-    >>> from agripandas.registry import DataFrameRegistry
+    >>> from agripandas import DataFrameRegistry
     >>> import pandas as pd
     >>> reg = DataFrameRegistry()
     >>> reg.register("foo", pd.DataFrame({"a": [1, 2]}), {"source": "demo"})

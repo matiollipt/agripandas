@@ -16,30 +16,81 @@ convenience.
 """
 
 from .registry import DataFrameRegistry
+
 from .loaders import load_excel, load_folder, load_csv, load_file
+
 from .schema import ColumnInfo, TableSchema, inspect_schema
+
+from .export import export_to_csv
+
 from .tools import (
+
     list_dataframes,
+
     describe_dataframe,
+
     get_columns,
+
     extract_subset,
+
     groupby_aggregate,
+
     compute_stat,
+
+    DescribeInput,
+
+    ColumnsInput,
+
+    SubsetInput,
+
+    GroupByInput,
+
+    StatInput,
+
 )
 
+
+
 __all__ = [
+
     "DataFrameRegistry",
+
     "load_excel",
+
     "load_csv",
+
     "load_file",
+
     "load_folder",
+
     "ColumnInfo",
+
     "TableSchema",
+
     "inspect_schema",
+
+    "export_to_csv",
+
     "list_dataframes",
+
     "describe_dataframe",
+
     "get_columns",
+
     "extract_subset",
+
     "groupby_aggregate",
+
     "compute_stat",
+
+    "DescribeInput",
+
+    "ColumnsInput",
+
+    "SubsetInput",
+
+    "GroupByInput",
+
+    "StatInput",
+
 ]

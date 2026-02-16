@@ -1,10 +1,18 @@
-agripandas
+# agripandas
 ==========
 
 This repository contains a minimal, working implementation of an
 experimental tabular analytics engine designed to serve as a safe
-backend for LangChain agents.  The modules under ``agripandas`` are
-organised according to a clear layer separation:
+backend for LangChain agents. The core library is located in the ``src/agripandas`` directory.
+
+The package provides a streamlined public API in its root, allowing you to import
+most components directly from ``agripandas``:
+
+```python
+from agripandas import DataFrameRegistry, load_excel, describe_dataframe
+```
+
+The modules are organised according to a clear layer separation:
 
 * **registry.py** – Defines a :class:`DataFrameRegistry` for storing
   named :class:`pandas.DataFrame` objects alongside provenance metadata.

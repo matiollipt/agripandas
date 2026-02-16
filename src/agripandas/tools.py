@@ -19,8 +19,7 @@ from typing import Any, Dict, List, Mapping, Optional
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
-from .registry import DataFrameRegistry
-from .schema import inspect_schema, TableSchema
+from . import DataFrameRegistry, inspect_schema, TableSchema
 
 
 # Input schemas for structured tools

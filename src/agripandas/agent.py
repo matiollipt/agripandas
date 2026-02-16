@@ -25,9 +25,9 @@ except ImportError:
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.tools import StructuredTool
 
-from .registry import DataFrameRegistry
-from .loaders import load_folder
-from .tools import (
+from . import (
+    DataFrameRegistry,
+    load_folder,
     list_dataframes,
     describe_dataframe,
     get_columns,

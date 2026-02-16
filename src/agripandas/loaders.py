@@ -19,7 +19,7 @@ from typing import Iterable, List, Optional
 
 import pandas as pd
 
-from .registry import DataFrameRegistry
+from . import DataFrameRegistry
 
 
 def _normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
