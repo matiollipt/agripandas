@@ -15,7 +15,7 @@ instead of pandas objects.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Optional
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 

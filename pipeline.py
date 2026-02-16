@@ -5,13 +5,9 @@ This script implements a pipeline to extract, inspect, and process data from
 Excel workbooks using the agripandas framework.
 """
 
-import json
 from agripandas import (
     DataFrameRegistry,
-    load_excel,
-    describe_dataframe,
-    extract_subset,
-    compute_stat
+    load_excel
 )
 
 def run_production_pipeline(input_file: str):
