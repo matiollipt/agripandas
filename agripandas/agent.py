@@ -1,25 +1,32 @@
 """
-Minimal agent scaffold.
+LangChain-based agent implementation.
 
-This module provides a simple foundation for building ReAct-style
-agents that interact with :class:`~agripandas.registry.DataFrameRegistry`
-and the structured tools defined in :mod:`agripandas.tools`.  The
-implementation here is deliberately minimal: it does not integrate with
-any specific LLM provider and avoids executing arbitrary code.
-
-The :class:`SimpleAgent` accepts a registry and a mapping of tool
-functions.  When run with a textual question, the agent proceeds
-through a fixed number of reasoning steps, each time selecting a tool
-based on a heuristic and combining its outputs.  The goal is to
-illustrate how one might orchestrate deterministic tools without
-coupling to any particular model.
+This module provides an agent that loads data artifacts (CSVs) from a directory
+into a DataFrameRegistry and uses an LLM (via Ollama) to answer questions
+using the structured tools defined in `agripandas.tools`.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Tuple
+from pathlib import Path
+from typing import Any, List
+
+from langchain_community.chat_models import ChatOllama
+try:
+    from langchain.agents import create_tool_calling_agent
+except ImportError:
+    create_tool_calling_agent = None
+    from langchain.agents import initialize_agent, AgentType
+
+try:
+    from langchain.agents import AgentExecutor
+except ImportError:
+    from langchain.agents.agent import AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.tools import StructuredTool
 
 from .registry import DataFrameRegistry
+from .loaders import load_folder
 from .tools import (
     list_dataframes,
     describe_dataframe,
@@ -27,115 +34,130 @@ from .tools import (
     extract_subset,
     groupby_aggregate,
     compute_stat,
+    DescribeInput,
+    ColumnsInput,
+    SubsetInput,
+    GroupByInput,
+    StatInput,
 )
 
 
-ToolFunc = Callable[..., Any]
-
-
-class SimpleAgent:
-    """A trivial agent that chooses tools via a heuristic.
-
-    This agent is intended for demonstration purposes only.  It parses
-    very simple questions to decide which tool to invoke.  Real
-    implementations should replace the naive heuristics here with
-    language model reasoning or rule-based planners.
+class AgriPandasAgent:
+    """
+    An agent that connects a DataFrameRegistry (populated from artifacts)
+    to an Ollama-powered LLM using LangChain.
     """
 
-    def __init__(self, registry: DataFrameRegistry, tools: Dict[str, ToolFunc]) -> None:
-        self.registry = registry
-        self.tools = tools
+    def __init__(
+        self,
+        artifacts_dir: str | Path = "./_artifacts",
+        model: str = "llama3",
+        base_url: str = "http://localhost:11434",
+    ) -> None:
+        self.registry = DataFrameRegistry()
+        self.artifacts_dir = Path(artifacts_dir)
 
-    def run(self, question: str, max_steps: int = 3) -> Dict[str, Any]:
-        """Run the agent on a question and return a final answer.
+        # 1. Load artifacts into registry
+        if self.artifacts_dir.exists():
+            # We assume artifacts are CSVs exported by the pipeline
+            load_folder(self.registry, str(self.artifacts_dir), pattern="*.csv")
+        else:
+            print(f"Warning: Artifacts directory '{self.artifacts_dir}' not found.")
 
-        The agent loops up to ``max_steps`` times.  At each iteration it
-        chooses a tool based on keywords in the question, calls the tool
-        with appropriate arguments and incorporates the result into a
-        running state.  This simplified flow is purely illustrative.
+        # 2. Setup LLM
+        self.llm = ChatOllama(
+            model=model,
+            base_url=base_url,
+            temperature=0,
+        )
 
-        Parameters
-        ----------
-        question:
-            The user question in plain language.
-        max_steps:
-            Maximum number of tool invocations.
+        # 3. Setup Tools
+        self.tools = self._build_tools()
 
-        Returns
-        -------
-        dict
-            The final answer.  The format depends on the tools used.
-        """
-        history: List[Tuple[str, Any]] = []
-        for _ in range(max_steps):
-            # Naive keyword-based dispatch
-            q = question.lower()
-            if "list" in q and not any(h[0] == "list" for h in history):
-                result = self.tools["list"]()
-                history.append(("list", result))
-            elif ("describe" in q or "schema" in q) and not any(h[0] == "describe" for h in history):
-                # Assume the user mentions the name after the word "describe"
-                parts = q.split()
-                name = None
-                try:
-                    if "describe" in parts:
-                        name_index = parts.index("describe") + 1
-                        if name_index < len(parts):
-                            name = parts[name_index]
-                except (ValueError, IndexError):
-                    pass
-                
-                if not name:
-                    tables = self.registry.list()
-                    if tables:
-                        name = tables[0]
-                
-                if name:
-                    try:
-                        result = self.tools["describe"](name)
-                        history.append(("describe", result))
-                    except KeyError:
-                        history.append(("error", f"Table '{name}' not found"))
-            elif "columns" in q and not any(h[0] == "columns" for h in history):
-                # Extract the table name heuristically
-                tables = self.registry.list()
-                if tables:
-                    name = tables[0]
-                    result = self.tools["columns"](name)
-                    history.append(("columns", result))
-            
-            # If we've already done something, or if no keywords match, we might stop
-            if not history:
-                # As a default, return available tables if nothing else matched
-                result = self.tools["list"]()
-                history.append(("list", result))
-                break
-            
-            # For this simple agent, if we have history, we might just break anyway 
-            # unless we want to allow it to continue. Let's allow it to continue 
-            # if there are multiple keywords.
-            if len(history) >= max_steps:
-                break
-        
-        return {"question": question, "history": history}
+        # 4. Setup Agent
+        if create_tool_calling_agent:
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        "You are a data analysis assistant. You have access to a set of "
+                        "dataframes loaded from CSV artifacts. Use the provided tools to "
+                        "inspect the data (list tables, describe schema) and answer "
+                        "questions. Always verify column names before running queries.",
+                    ),
+                    ("human", "{input}"),
+                    ("placeholder", "{agent_scratchpad}"),
+                ]
+            )
 
+            agent = create_tool_calling_agent(self.llm, self.tools, prompt)
+            self.agent_executor = AgentExecutor(
+                agent=agent, tools=self.tools, verbose=True, handle_parsing_errors=True
+            )
+        else:
+            # Fallback for older LangChain versions
+            self.agent_executor = initialize_agent(
+                tools=self.tools,
+                llm=self.llm,
+                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+                verbose=True,
+                handle_parsing_errors=True,
+            )
 
-def default_tools(registry: DataFrameRegistry) -> Dict[str, ToolFunc]:
-    """Construct the default tool mapping for :class:`SimpleAgent`.
+    def _build_tools(self) -> List[StructuredTool]:
+        """Create LangChain tools bound to the current registry."""
+        return [
+            StructuredTool.from_function(
+                func=lambda: list_dataframes(self.registry),
+                name="list_dataframes",
+                description="List the names of all available dataframes.",
+            ),
+            StructuredTool.from_function(
+                func=lambda name: describe_dataframe(self.registry, name),
+                name="describe_dataframe",
+                description="Get the schema (columns, dtypes) of a dataframe.",
+                args_schema=DescribeInput,
+            ),
+            StructuredTool.from_function(
+                func=lambda name: get_columns(self.registry, name),
+                name="get_columns",
+                description="Get a list of column names for a dataframe.",
+                args_schema=ColumnsInput,
+            ),
+            StructuredTool.from_function(
+                func=lambda name, filters=None, columns=None: extract_subset(
+                    self.registry, name, filters=filters, columns=columns
+                ),
+                name="extract_subset",
+                description="Extract a subset of rows based on filters.",
+                args_schema=SubsetInput,
+            ),
+            StructuredTool.from_function(
+                func=lambda name, group_cols, agg_spec: groupby_aggregate(
+                    self.registry, name, group_cols, agg_spec
+                ),
+                name="groupby_aggregate",
+                description="Group by columns and calculate aggregations.",
+                args_schema=GroupByInput,
+            ),
+            StructuredTool.from_function(
+                func=lambda name, column, metric: compute_stat(
+                    self.registry, name, column, metric
+                ),
+                name="compute_stat",
+                description="Compute a statistic (mean, max, etc.) for a column.",
+                args_schema=StatInput,
+            ),
+        ]
 
-    Each entry in the returned dictionary is a zero- or single-argument
-    function bound to the provided registry.  They can be used directly
-    by an agent to operate on the current dataframes.
-    """
-    return {
-        "list": lambda: list_dataframes(registry),
-        "describe": lambda name: describe_dataframe(registry, name),
-        "columns": lambda name: get_columns(registry, name),
-        "subset": lambda name, filters=None, columns=None: extract_subset(
-            registry, name, filters=filters, columns=columns
-        ),
-        "groupby": lambda name, group_cols, agg_spec: groupby_aggregate(
-            registry, name, group_cols, agg_spec
-        ),
-        "stat": lambda name, column, metric: compute_stat(registry, name, column, metric),
-    }
+    def run(self, question: str) -> Any:
+        """Run the agent on a question."""
+        result = self.agent_executor.invoke({"input": question})
+        return result["output"]
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1:
+        print(AgriPandasAgent().run(sys.argv[1]))
+    else:
+        print("Usage: python -m agripandas.agent 'Your question here'")

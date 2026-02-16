@@ -44,6 +44,19 @@ class DataFrameRegistry:
 
     This class does not enforce any global or singleton behaviour.  Create
     separate instances as needed.
+    
+    Example:
+    >>> from agripandas.registry import DataFrameRegistry
+    >>> import pandas as pd
+    >>> reg = DataFrameRegistry()
+    >>> reg.register("foo", pd.DataFrame({"a": [1, 2]}), {"source": "demo"})
+    >>> reg.list()
+    ['foo']
+    >>> df = reg.get("foo")
+    >>> df
+       a
+    0  1
+    1  2
     """
 
     def __init__(self) -> None:

@@ -6,7 +6,7 @@ Excel workbooks using the agripandas framework.
 """
 
 import json
-from agripandas.src import (
+from agripandas import (
     DataFrameRegistry,
     load_excel,
     describe_dataframe,
